@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Duplicações RS — Painel</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f0f2f5;--bg2:#fff;--tx:#222;--tx2:#666;
+  --bd:#e0e0e0;--hd:#f8f8f8;--hi:#f0f4ff;
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--tx)}
+.dark{--bg:#1a1a2e;--bg2:#16213e;--tx:#e0e0e0;--tx2:#aaa;--bd:#2d3561;--hd:#0f3460;--hi:#1b2a5e}
+#app{max-width:1600px;margin:0 auto;padding:12px}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:rgba(255,255,255,.92);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.spinner{width:44px;height:44px;border:5px solid #ddd;
+  border-top-color:#1565C0;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading p{font-size:14px;color:#555;font-weight:600}
+#prog-wrap{width:260px;height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden}
+#prog-bar{height:100%;width:0;background:#1565C0;transition:width .3s}
+#loading-msg{font-size:12px;color:#888}
+
+/* HEADER */
+.header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--bg2);padding:10px 14px;border-radius:10px;
+  box-shadow:0 1px 6px rgba(0,0,0,.1);margin-bottom:10px}
+.header h1{font-size:14px;font-weight:700;color:#1a237e;flex:1;min-width:180px}
+.dark .header h1{color:#90CAF9}
+.tabs{display:flex;gap:5px;flex-wrap:wrap}
+.tab{padding:5px 12px;border:1.5px solid var(--bd);background:var(--bg2);
+  border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;
+  transition:all .15s;white-space:nowrap;color:var(--tx)}
+.tab:hover{border-color:#1565C0;color:#1565C0}
+.tab.active{background:#1565C0;color:white;border-color:#1565C0}
+.btn{padding:5px 12px;border:none;border-radius:20px;cursor:pointer;
+  font-size:12px;font-weight:600;white-space:nowrap}
+.btn-dark{background:#37474F;color:white}
+.btn-dark:hover{background:#263238}
+.btn-export{background:#2e7d32;color:white}
+.btn-export:hover{background:#1b5e20}
+
+/* LAYOUT */
+#layout{display:flex;gap:10px;align-items:flex-start}
+#sidebar{width:220px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+#centro{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.card{background:var(--bg2);border-radius:10px;border:1px solid var(--bd);
+  padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.card h3{font-size:12px;font-weight:700;color:var(--tx);margin-bottom:8px;
+  padding-bottom:6px;border-bottom:1px solid var(--bd)}
+
+/* CAMADAS */
+.cam-item{display:flex;align-items:center;gap:7px;padding:4px 0;
+  cursor:pointer;user-select:none;font-size:12px;color:var(--tx)}
+.cam-item.off{opacity:.4}
+.cam-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+
+/* ANOS */
+.leg-item{display:flex;align-items:center;gap:7px;padding:3px 0;
+  cursor:pointer;user-select:none;font-size:12px;color:var(--tx)}
+.leg-item.off .leg-line{opacity:.2}
+.leg-item.off span{opacity:.3;text-decoration:line-through}
+.leg-line{width:24px;height:5px;border-radius:3px;flex-shrink:0}
+
+/* MUNICÍPIOS */
+#lista-munis{max-height:200px;overflow-y:auto}
+.muni-item{display:flex;align-items:center;gap:5px;padding:2px 0}
+.muni-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* MAP */
+#map{height:530px;border-radius:10px;border:1px solid var(--bd);z-index:1}
+
+/* STATS */
+#stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat-card{background:var(--bg2);border-radius:8px;padding:8px 14px;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);flex:1;min-width:100px;text-align:center;
+  border:1px solid var(--bd)}
+.stat-val{font-size:20px;font-weight:700;color:#1565C0}
+.stat-lbl{font-size:10px;color:var(--tx2);margin-top:1px}
+
+/* TABELA */
+#tbl-wrap{background:var(--bg2);border-radius:10px;border:1px solid var(--bd);
+  overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.th2{display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:var(--hd);border-bottom:1px solid var(--bd);
+  cursor:pointer;user-select:none}
+.th2 h3{font-size:13px;font-weight:600;color:var(--tx)}
+.tbl-scroll{max-height:260px;overflow-y:auto;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--hd);padding:7px 9px;text-align:left;font-weight:600;
+  position:sticky;top:0;z-index:2;border-bottom:1.5px solid var(--bd);
+  white-space:nowrap;color:var(--tx)}
+td{padding:5px 9px;border-bottom:1px solid var(--bd);white-space:nowrap;color:var(--tx)}
+tr:hover td{background:var(--hi)}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;
+  font-size:11px;font-weight:700;color:white}
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Carregando dados…</p>
+  <div id="prog-wrap"><div id="prog-bar"></div></div>
+  <span id="loading-msg">Iniciando…</span>
+</div>
+
+<div id="app" style="display:none">
+
+  <div class="header">
+    <h1>🛣️ Duplicações e Ampliações de Rodovias · Rio Grande do Sul</h1>
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-b="todos">Todos</button>
+      <button class="tab" data-b="bloco1">Bloco 1</button>
+      <button class="tab" data-b="bloco2">Bloco 2</button>
+      <button class="tab" data-b="bloco3">Bloco 3 · CSG</button>
+      <button class="tab" data-b="bloco4">Bloco 4 · SACYR</button>
+    </div>
+    <button class="btn btn-dark" onclick="toggleDark()">🌙 Noturno</button>
+    <button class="btn btn-export" onclick="exportImg()">📸 Exportar</button>
+    <button class="btn btn-export" style="background:#1565C0" onclick="downloadCSV()">⬇ CSV</button>
+  </div>
+
+  <div id="stats">
+    <div class="stat-card"><div class="stat-val" id="st-trechos">—</div><div class="stat-lbl">Trechos</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-ext">—</div><div class="stat-lbl">Extensão (km)</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-rod">—</div><div class="stat-lbl">Rodovias</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-anos">—</div><div class="stat-lbl">Anos</div></div>
+    <div class="stat-card"><div class="stat-val" id="st-munis">—</div><div class="stat-lbl">Municípios</div></div>
+  </div>
+
+  <div id="layout">
+    <div id="sidebar">
+      <div class="card">
+        <h3>📂 Camadas</h3>
+        <div id="cam-list"></div>
+      </div>
+      <div class="card">
+        <h3>📅 Ano de Obra</h3>
+        <div id="leg-anos"></div>
+      </div>
+      <div class="card">
+        <h3>🏙️ Municípios (<span id="n-mu">0</span>)</h3>
+        <div id="lista-munis"></div>
+      </div>
+    </div>
+    <div id="centro">
+      <div id="map"></div>
+      <div id="tbl-wrap">
+        <div class="th2" onclick="toggleTabela()">
+          <h3 id="tbl-title">Todos os Trechos</h3>
+          <div style="display:flex;gap:6px">
+            <span id="rc" style="font-size:11px;color:var(--tx2)"></span>
+            <span id="tbl-tog" style="font-size:11px;color:var(--tx2)">▼</span>
+          </div>
+        </div>
+        <div class="tbl-scroll" id="tbl-scroll">
+          <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIGURAÇÃO
+// ═══════════════════════════════════════════════════════════════════════════
+const META = {
+  b1_dup  :{label:"Bloco 1 · Duplicações",    bloco:"bloco1",cor:"#1565C0",temAno:true, naTabela:true,
+             muniCor:"rgba(21,101,192,0.20)",  muniBorda:"#1565C0"},
+  b1_ers10:{label:"Bloco 1 · ERS-010",         bloco:"bloco1",cor:"#0288D1",temAno:true, naTabela:true,
+             muniCor:"rgba(2,136,209,0.20)",   muniBorda:"#0288D1"},
+  b2_dup  :{label:"Bloco 2 · Duplicações",    bloco:"bloco2",cor:"#6A1B9A",temAno:true, naTabela:true,
+             muniCor:"rgba(106,27,154,0.20)",  muniBorda:"#6A1B9A"},
+  b2_comp :{label:"Bloco 2 · Composição",     bloco:"bloco2",cor:"#AD1457",temAno:false,naTabela:false,
+             muniCor:"rgba(173,20,87,0.15)",   muniBorda:"#AD1457"},
+  b3_dup  :{label:"Bloco 3 · CSG",             bloco:"bloco3",cor:"#2E7D32",temAno:true, naTabela:true,
+             muniCor:"rgba(46,125,50,0.20)",   muniBorda:"#2E7D32"},
+  b4_dup  :{label:"Bloco 4 · SACYR",           bloco:"bloco4",cor:"#E65100",temAno:true, naTabela:true,
+             muniCor:"rgba(230,81,0,0.20)",    muniBorda:"#E65100"},
+};
+const CAM_ORDER = ["b1_dup","b1_ers10","b2_dup","b2_comp","b3_dup","b4_dup"];
+
+const COLS = {
+  b1_dup  :["Rodovia","SRE","km_inicial","km_final","Extensao_km","Ano_obra","Concessao","Agregado"],
+  b1_ers10:["Rodovia","codigo_sre","km_inicio","km_final","extensao_sre_km","Ano_obra","concessao"],
+  b2_dup  :["Rodovia","SRE","km_inicial","km_final","Extensao_km","Ano_obra","Concessao","Agregado"],
+  b2_comp :["Rodovia","codigo_sre","km_inicio","km_final","extensao_sre_km","concessao"],
+  b3_dup  :["Rodovia","SRE","km_inicial","km_final","Extensao_km","Ano_obra","Agregado"],
+  b4_dup  :["Rodovia","Subtrecho","SRE","km_inicial","km_final","Extensao_km","Ano_obra","Tipo_trecho","Agregado"],
+};
+
+const ANO_COR = {
+  3:"#B71C1C",4:"#E65100",5:"#F9A825",6:"#558B2F",
+  7:"#00838F",8:"#1565C0",9:"#4527A0",10:"#4E342E",
+  19:"#880E4F",20:"#37474F",21:"#006064"
+};
+function corAno(a){ return ANO_COR[+a] || "#888"; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════════════════════════════════════════
+let GJ = {};           // GeoJSONs carregados via fetch
+let MUNIS_MAP = {};
+let blocoAtivo    = "todos";
+let camadasAtivas = new Set(Object.keys(META));
+let anosAtivos    = new Set();
+let tabelaAberta  = true;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAPA
+// ═══════════════════════════════════════════════════════════════════════════
+const map = L.map("map",{zoomControl:true}).setView([-29.5,-52.5],7);
+L.tileLayer(
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  {attribution:"Esri, Maxar, USGS",maxZoom:19}
+).addTo(map);
+L.tileLayer(
+  "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+  {attribution:"",maxZoom:19,pane:"shadowPane"}
+).addTo(map);
+
+const munisLayer = L.layerGroup().addTo(map);
+const concLayer  = L.layerGroup().addTo(map);
+const rodsLayer  = L.layerGroup().addTo(map);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CARREGAMENTO DOS DADOS VIA FETCH
+// ═══════════════════════════════════════════════════════════════════════════
+const ARQUIVOS = [
+  {key:"municipios",    url:"data/municipios.geojson"},
+  {key:"concedidas",   url:"data/rodovias_concedidas.geojson"},
+  {key:"b1_dup",       url:"data/bloco1_dup.geojson"},
+  {key:"b1_ers10",     url:"data/bloco1_ers10.geojson"},
+  {key:"b2_dup",       url:"data/bloco2_dup.geojson"},
+  {key:"b2_comp",      url:"data/bloco2_comp.geojson"},
+  {key:"b3_dup",       url:"data/bloco3_dup.geojson"},
+  {key:"b4_dup",       url:"data/bloco4_dup.geojson"},
+  {key:"_munis_map",   url:"data/municipios_por_camada.json"},
+];
+
+async function carregarDados() {
+  const bar = document.getElementById("prog-bar");
+  const msg = document.getElementById("loading-msg");
+  const n   = ARQUIVOS.length;
+
+  for (let i = 0; i < n; i++) {
+    const {key, url} = ARQUIVOS[i];
+    msg.textContent = url.replace("data/","");
+    bar.style.width = `${Math.round((i / n) * 100)}%`;
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      if (key === "_munis_map") MUNIS_MAP = json;
+      else GJ[key] = json;
+    } catch(e) {
+      console.warn("Falha ao carregar", url, e);
+      if (key !== "_munis_map") GJ[key] = {type:"FeatureCollection",features:[]};
+    }
+  }
+
+  bar.style.width = "100%";
+  msg.textContent = "Renderizando…";
+  setTimeout(inicializar, 200);
+}
+
+function inicializar() {
+  // Rodovias concedidas (fundo)
+  if (GJ.concedidas && GJ.concedidas.features && GJ.concedidas.features.length) {
+    L.geoJSON(GJ.concedidas,{
+      style:()=>({color:"#FFD600",weight:2,opacity:0.5,dashArray:"4,4"})
+    }).addTo(concLayer);
+  }
+  renderTudo();
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "";
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MUNICÍPIOS
+// ═══════════════════════════════════════════════════════════════════════════
+function getMuniStyle(nme) {
+  for (const key of CAM_ORDER) {
+    if (camadasAtivas.has(key) && (MUNIS_MAP[key]||[]).includes(nme)) {
+      return {fillColor:META[key].muniCor,fillOpacity:1,
+              color:META[key].muniBorda,weight:1.5,opacity:0.8};
+    }
+  }
+  return null;
+}
+
+function renderMunis() {
+  munisLayer.clearLayers();
+  const visiveis = new Set();
+  for (const key of CAM_ORDER) {
+    if (camadasAtivas.has(key)) (MUNIS_MAP[key]||[]).forEach(m => visiveis.add(m));
+  }
+  if (!GJ.municipios) return;
+  GJ.municipios.features.forEach(f => {
+    const nme = f.properties.NM_MUN;
+    if (!visiveis.has(nme)) return;
+    const estilo = getMuniStyle(nme);
+    if (!estilo) return;
+    L.geoJSON(f,{style:estilo})
+      .bindTooltip(nme,{sticky:true})
+      .addTo(munisLayer);
+  });
+
+  // Lista lateral
+  const lista = document.getElementById("lista-munis");
+  lista.innerHTML = "";
+  const muniCorMap = {};
+  for (const key of CAM_ORDER) {
+    if (camadasAtivas.has(key))
+      (MUNIS_MAP[key]||[]).forEach(m => { if(!(m in muniCorMap)) muniCorMap[m]=META[key].muniBorda; });
+  }
+  [...visiveis].sort().forEach(m => {
+    const div = document.createElement("div");
+    div.className = "muni-item";
+    div.innerHTML = `<div class="muni-dot" style="background:${muniCorMap[m]||'#888'}"></div>`+
+                    `<span style="font-size:11px">${m}</span>`;
+    lista.appendChild(div);
+  });
+  document.getElementById("n-mu").textContent = visiveis.size;
+  document.getElementById("st-munis").textContent = visiveis.size;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RODOVIAS
+// ═══════════════════════════════════════════════════════════════════════════
+function renderRodovias() {
+  rodsLayer.clearLayers();
+  CAM_ORDER.forEach(key => {
+    if (!camadasAtivas.has(key)) return;
+    const meta = META[key];
+    if (blocoAtivo !== "todos" && meta.bloco !== blocoAtivo) return;
+    if (!GJ[key] || !GJ[key].features) return;
+
+    GJ[key].features.forEach(f => {
+      const p   = f.properties;
+      const ano = +p.Ano_obra;
+      if (meta.temAno && !anosAtivos.has(ano)) return;
+
+      const cor = meta.temAno ? corAno(ano) : meta.cor;
+      const pl  = L.geoJSON(f,{style:{color:cor,weight:5,opacity:0.9}});
+
+      const rod  = p.Rodovia || p.nome || "";
+      const sre  = p.SRE || p.codigo_sre || "";
+      const kmi  = p.km_inicial ?? p.km_inicio ?? "";
+      const kmf  = p.km_final ?? "";
+      const ext  = p.Extensao_km ?? p.extensao_sre_km ?? "";
+      const sub  = p.Subtrecho  ? ` · ${p.Subtrecho}` : "";
+      const tipo = p.Tipo_trecho ? ` · ${p.Tipo_trecho}` : "";
+
+      pl.bindTooltip(
+        `<b>${rod}</b> ${sre}${sub}${tipo}<br>`+
+        `km ${kmi}–${kmf} · Ext: <b>${ext} km</b><br>`+
+        `Ano de obra: <b>${ano||"—"}</b>`,
+        {sticky:true}
+      );
+      pl.on("click",()=>map.fitBounds(L.geoJSON(f).getBounds(),{maxZoom:14,padding:[40,40]}));
+      pl.addTo(rodsLayer);
+    });
+  });
+  if (rodsLayer.getLayers().length > 0)
+    map.fitBounds(rodsLayer.getBounds(),{padding:[30,30]});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LEGENDA DE ANOS
+// ═══════════════════════════════════════════════════════════════════════════
+function renderLegendaAnos() {
+  const anos = new Set();
+  CAM_ORDER.forEach(key => {
+    if (!camadasAtivas.has(key) || !META[key].temAno) return;
+    if (blocoAtivo !== "todos" && META[key].bloco !== blocoAtivo) return;
+    (GJ[key]?.features||[]).forEach(f => {
+      const a = +f.properties.Ano_obra;
+      if (!isNaN(a)) anos.add(a);
+    });
+  });
+  const cont = document.getElementById("leg-anos");
+  cont.innerHTML = "";
+  [...anos].sort((a,b)=>a-b).forEach(a => {
+    const div = document.createElement("div");
+    div.className = "leg-item" + (anosAtivos.has(a) ? "" : " off");
+    div.innerHTML = `<div class="leg-line" style="background:${corAno(a)}"></div><span>Ano ${a}</span>`;
+    div.onclick = () => toggleAno(a);
+    cont.appendChild(div);
+  });
+}
+function toggleAno(a) {
+  if (anosAtivos.has(a)) anosAtivos.delete(a); else anosAtivos.add(a);
+  renderLegendaAnos(); renderRodovias(); renderTabela(); renderStats();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMADAS
+// ═══════════════════════════════════════════════════════════════════════════
+function renderCamadas() {
+  const cont = document.getElementById("cam-list");
+  cont.innerHTML = "";
+  CAM_ORDER.forEach(key => {
+    const m = META[key];
+    if (blocoAtivo !== "todos" && m.bloco !== blocoAtivo) return;
+    const div = document.createElement("div");
+    div.className = "cam-item" + (camadasAtivas.has(key) ? "" : " off");
+    div.innerHTML = `<div class="cam-dot" style="background:${m.cor}"></div><span>${m.label}</span>`;
+    div.onclick = () => {
+      if (camadasAtivas.has(key)) camadasAtivas.delete(key); else camadasAtivas.add(key);
+      renderTudo();
+    };
+    cont.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TABELA
+// ═══════════════════════════════════════════════════════════════════════════
+function renderTabela() {
+  const tbody = document.getElementById("tbody");
+  const thead = document.getElementById("thead");
+  tbody.innerHTML = thead.innerHTML = "";
+  const linhas = [];
+  CAM_ORDER.forEach(key => {
+    const m = META[key];
+    if (!camadasAtivas.has(key) || !m.naTabela) return;
+    if (blocoAtivo !== "todos" && m.bloco !== blocoAtivo) return;
+    (GJ[key]?.features||[]).forEach(f => {
+      const a = +f.properties.Ano_obra;
+      if (m.temAno && !anosAtivos.has(a)) return;
+      linhas.push({key,f});
+    });
+  });
+  if (!linhas.length) { document.getElementById("rc").textContent="0 trechos"; return; }
+
+  const primeiroKey = linhas[0].key;
+  const colunas = COLS[primeiroKey] || Object.keys(linhas[0].f.properties).filter(c=>c!=="geometry");
+  const tr = document.createElement("tr");
+  tr.innerHTML = ["Camada",...colunas].map(c=>`<th>${c}</th>`).join("");
+  thead.appendChild(tr);
+
+  linhas.forEach(({key,f}) => {
+    const p = f.properties;
+    const tr = document.createElement("tr");
+    tr.innerHTML = [
+      `<td><span class="badge" style="background:${META[key].cor}">${META[key].label.split("·")[1]?.trim()||META[key].label}</span></td>`,
+      ...colunas.map(c => {
+        const v = p[c];
+        if (c==="Ano_obra" && !isNaN(+v))
+          return `<td><span class="badge" style="background:${corAno(+v)}">Ano ${v}</span></td>`;
+        return `<td>${v??""}</td>`;
+      })
+    ].join("");
+    tr.onclick = () => map.fitBounds(L.geoJSON(f).getBounds(),{maxZoom:14,padding:[40,40]});
+    tbody.appendChild(tr);
+  });
+  document.getElementById("rc").textContent = `${linhas.length} trechos`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════════════════════════════════
+function renderStats() {
+  let trechos=0, ext=0;
+  const rodSet=new Set(), anoSet=new Set();
+  CAM_ORDER.forEach(key => {
+    const m = META[key];
+    if (!camadasAtivas.has(key)||!m.naTabela) return;
+    if (blocoAtivo !== "todos" && m.bloco !== blocoAtivo) return;
+    (GJ[key]?.features||[]).forEach(f => {
+      const p = f.properties, ano = +p.Ano_obra;
+      if (m.temAno && !anosAtivos.has(ano)) return;
+      trechos++;
+      ext += +(p.Extensao_km ?? p.extensao_sre_km ?? 0);
+      if (p.Rodovia||p.nome) rodSet.add(p.Rodovia||p.nome);
+      if (!isNaN(ano)) anoSet.add(ano);
+    });
+  });
+  document.getElementById("st-trechos").textContent = trechos;
+  document.getElementById("st-ext").textContent     = ext.toFixed(1);
+  document.getElementById("st-rod").textContent     = rodSet.size;
+  document.getElementById("st-anos").textContent    = anoSet.size;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER TUDO
+// ═══════════════════════════════════════════════════════════════════════════
+function recalcularAnos() {
+  const anos = new Set();
+  CAM_ORDER.forEach(key => {
+    if (!camadasAtivas.has(key)||!META[key].temAno) return;
+    if (blocoAtivo !== "todos" && META[key].bloco !== blocoAtivo) return;
+    (GJ[key]?.features||[]).forEach(f => {
+      const a = +f.properties.Ano_obra;
+      if (!isNaN(a)) anos.add(a);
+    });
+  });
+  anosAtivos = anos;
+}
+function renderTudo() {
+  recalcularAnos();
+  renderCamadas();
+  renderLegendaAnos();
+  renderMunis();
+  renderRodovias();
+  renderTabela();
+  renderStats();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════════════
+document.getElementById("tabs").onclick = e => {
+  const tab = e.target.closest(".tab");
+  if (!tab) return;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  tab.classList.add("active");
+  blocoAtivo = tab.dataset.b;
+  const nomes={todos:"Todos os Blocos",bloco1:"Bloco 1",bloco2:"Bloco 2",
+               bloco3:"Bloco 3 · CSG",bloco4:"Bloco 4 · SACYR"};
+  document.getElementById("tbl-title").textContent = nomes[blocoAtivo];
+  camadasAtivas = new Set(
+    Object.keys(META).filter(k => blocoAtivo==="todos" || META[k].bloco===blocoAtivo)
+  );
+  renderTudo();
+};
+
+function toggleTabela() {
+  tabelaAberta = !tabelaAberta;
+  document.getElementById("tbl-scroll").style.display = tabelaAberta ? "" : "none";
+  document.getElementById("tbl-tog").textContent = tabelaAberta ? "▼" : "▶";
+}
+function toggleDark() { document.body.classList.toggle("dark"); }
+function exportImg() {
+  html2canvas(document.getElementById("app"),{useCORS:true,scale:2}).then(c=>{
+    const a=document.createElement("a");
+    a.download=`painel_rs_${blocoAtivo}.png`;
+    a.href=c.toDataURL("image/png");a.click();
+  });
+}
+function downloadCSV() {
+  const linhas=[];
+  CAM_ORDER.forEach(key=>{
+    const m=META[key];
+    if(!camadasAtivas.has(key)||!m.naTabela) return;
+    if(blocoAtivo!=="todos"&&m.bloco!==blocoAtivo) return;
+    (GJ[key]?.features||[]).forEach(f=>{
+      const p=f.properties,ano=+p.Ano_obra;
+      if(m.temAno&&!anosAtivos.has(ano)) return;
+      linhas.push({camada:m.label,...Object.fromEntries((COLS[key]||[]).map(c=>[c,p[c]??""]))});
+    });
+  });
+  if(!linhas.length) return;
+  const h=Object.keys(linhas[0]);
+  const csv=[h.join(","),...linhas.map(l=>h.map(k=>`"${(l[k]||"").toString().replace(/"/g,'""')}"`).join(","))].join("
+");
+  const a=document.createElement("a");
+  a.href="data:text/csv;charset=utf-8,"+encodeURIComponent("﻿"+csv);
+  a.download=`duplicacoes_rs_${blocoAtivo}.csv`;a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INICIAR
+// ═══════════════════════════════════════════════════════════════════════════
+carregarDados();
+</script>
+</body>
+</html>
