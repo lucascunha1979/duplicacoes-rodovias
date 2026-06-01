@@ -254,17 +254,24 @@ async function carregarDados() {
   const msg = document.getElementById("loading-msg");
   const n   = ARQUIVOS.length;
 
+  // Calcula base path para GitHub Pages (ex: /nome-repo) ou raiz
+  const basePath = window.location.pathname
+    .replace(/index\.html$/, "").replace(/\/$/, "");
+
   for (let i = 0; i < n; i++) {
     const {key, url} = ARQUIVOS[i];
-    msg.textContent = url.replace("data/","");
+    msg.textContent = url.replace("data/", "");
     bar.style.width = `${Math.round((i / n) * 100)}%`;
     try {
-      const res = await fetch(url);
-      const json = await res.json();
-      if (key === "_munis_map") MUNIS_MAP = json;
-      else GJ[key] = json;
+      const fullUrl = basePath ? `${basePath}/${url}` : url;
+      console.log("[fetch]", fullUrl);
+      const res = await fetch(fullUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status} — ${fullUrl}`);
+      const data = await res.json();
+      if (key === "_munis_map") MUNIS_MAP = data;
+      else GJ[key] = data;
     } catch(e) {
-      console.warn("Falha ao carregar", url, e);
+      console.error("[fetch error]", url, e.message);
       if (key !== "_munis_map") GJ[key] = {type:"FeatureCollection",features:[]};
     }
   }
