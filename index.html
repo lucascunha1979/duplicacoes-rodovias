@@ -282,15 +282,19 @@ async function carregarDados() {
 }
 
 function inicializar() {
-  // Rodovias concedidas (fundo)
-  if (GJ.concedidas && GJ.concedidas.features && GJ.concedidas.features.length) {
-    L.geoJSON(GJ.concedidas,{
-      style:()=>({color:"#FFD600",weight:2,opacity:0.5,dashArray:"4,4"})
-    }).addTo(concLayer);
-  }
-  renderTudo();
+  // Esconde loading PRIMEIRO — garante que nunca fica preso
   document.getElementById("loading").style.display = "none";
   document.getElementById("app").style.display = "";
+  try {
+    if (GJ.concedidas && GJ.concedidas.features && GJ.concedidas.features.length) {
+      L.geoJSON(GJ.concedidas,{
+        style:()=>({color:"#FFD600",weight:2,opacity:0.5,dashArray:"4,4"})
+      }).addTo(concLayer);
+    }
+    renderTudo();
+  } catch(e) {
+    console.error("[inicializar error]", e);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
