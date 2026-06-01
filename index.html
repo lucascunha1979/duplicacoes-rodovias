@@ -570,10 +570,9 @@ function downloadCSV() {
   });
   if(!linhas.length) return;
   const h=Object.keys(linhas[0]);
-  const csv=[h.join(","),...linhas.map(l=>h.map(k=>`"${(l[k]||"").toString().replace(/"/g,'""')}"`).join(","))].join("
-");
+  const csv=[h.join(","),...linhas.map(l=>h.map(k=>`"${(l[k]||"").toString().replace(/"/g,'""')}"`).join(","))].join("\n");
   const a=document.createElement("a");
-  a.href="data:text/csv;charset=utf-8,"+encodeURIComponent("﻿"+csv);
+  a.href="data:text/csv;charset=utf-8,"+encodeURIComponent("\uFEFF"+csv);
   a.download=`duplicacoes_rs_${blocoAtivo}.csv`;a.click();
 }
 
